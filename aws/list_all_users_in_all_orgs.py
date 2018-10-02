@@ -10,8 +10,8 @@ It relies on a "coreosinc" profile being available in ~/.aws/credentials, which 
 import sys
 import csv
 from pprint import pprint
-from awsapi.utils import (get_session, get_sts_client, get_sts_token_for_account, get_accounts)
-from awsapi.IamOperations import IamOperations
+import awsapi.AwsSession
+import awsapi.IamOperations
 
 # Important: In AWS, "account" refers to a resource container (VMs, networks, etc), and "IAM account" refers to (typically) a person.
 # "IAM accounts" (also referred to as "users") are contained within "accounts".
@@ -22,9 +22,8 @@ from awsapi.IamOperations import IamOperations
 # AWS Root Account ID - This is the master account. Sub-accounts are organized in a hierarchy using AWS Organizations.
 ROOT_ACCOUNT_ID = '595879546273'
 
-session = get_session(profile_name="coreosinc")
-sts_client = get_sts_client(session)
-accounts = get_accounts(session)
+aws_session = awsapi.AwsSession.AwsSession.for_profile(profile_name="coreosinc")
+accounts = aws_session.get_accounts()
 active_accounts = [ acct for acct in accounts if acct['Status'] == 'ACTIVE' ]
 
 csvout = csv.writer(
@@ -46,12 +45,12 @@ csvout.writerow([
 
 for account in active_accounts:
     if account['Id'] == ROOT_ACCOUNT_ID:
-        iam_ops = IamOperations.for_session(session)
+        iam_ops = awsapi.IamOperations.IamOperations.for_session(session)
     else:
-        sts_token = get_sts_token_for_account(sts_client, ROOT_ACCOUNT_ID, account['Id'])
+        sts_token = aws_session.get_sts_token_for_account(ROOT_ACCOUNT_ID, account['Id'])
         if sts_token is None:
             raise Exception("Could not get STS token for {}".format(account['Name']))
-        iam_ops = IamOperations.for_account(sts_token['Credentials'])
+        iam_ops = awsapi.IamOperations.IamOperations.for_account(aws_session.session, sts_token['Credentials'])
 
     iam_account_alias = iam_ops.get_account_alias()
     if iam_account_alias is None:
