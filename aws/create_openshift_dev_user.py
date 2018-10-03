@@ -11,8 +11,9 @@ import sys
 import csv
 from pprint import pprint
 import argparse
-import awsapi.AwsSession
-import awsapi.IamOperations
+import os.path
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'libs/python'))
+import awsapi
 
 ACCOUNT_NAME = "openshift-dev"
 TEMPLATE = """
@@ -36,8 +37,8 @@ def parse_args():
 
 
 def get_user_factory(aws_session):
-    iam_ops = awsapi.IamOperations.IamOperations.for_session(aws_session.session)
-    user_factory = awsapi.IamOperations.UserFactory(iam_ops)
+    iam_ops = awsapi.IamOperations.for_session(aws_session.session)
+    user_factory = awsapi.UserFactory(iam_ops)
     return user_factory
 
 
@@ -55,7 +56,7 @@ def create_user(result, aws_account_id, account_alias):
 
 args = parse_args()
 username = args.username
-aws_session = awsapi.AwsSession.AwsSession.for_profile(profile_name=ACCOUNT_NAME)
+aws_session = awsapi.AwsSession.for_profile(profile_name=ACCOUNT_NAME)
 result = get_user_factory(aws_session).create_user(username=username, group_names=["Dev"])
 create_user(
     result,

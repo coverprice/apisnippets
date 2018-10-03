@@ -10,8 +10,9 @@ It relies on a "coreosinc" profile being available in ~/.aws/credentials, which 
 import sys
 import csv
 from pprint import pprint
-import awsapi.AwsSession
-import awsapi.IamOperations
+import os.path
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'libs/python'))
+import awsapi
 
 # Important: In AWS, "account" refers to a resource container (VMs, networks, etc), and "IAM account" refers to (typically) a person.
 # "IAM accounts" (also referred to as "users") are contained within "accounts".
@@ -24,9 +25,9 @@ ROOT_ACCOUNT_ID = '595879546273'
 CORE_SERVICES_ACCOUNT_ID = '816138690521'
 
 # Program begins here
-aws_session = awsapi.AwsSession.AwsSession.for_profile(profile_name="coreosinc")
+aws_session = awsapi.AwsSession.for_profile(profile_name="coreosinc")
 sts_token = aws_session.get_sts_token_for_account(ROOT_ACCOUNT_ID, CORE_SERVICES_ACCOUNT_ID)
-iam_ops = awsapi.IamOperations.IamOperations.for_account(aws_session.session, sts_token['Credentials'])
+iam_ops = awsapi.IamOperations.for_account(aws_session.session, sts_token['Credentials'])
 policies = iam_ops.get_all_policies()
 for policy_metadata in policies:
     policy = iam_ops.get_policy(policy_metadata['Arn'])
