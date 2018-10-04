@@ -52,6 +52,6 @@ with tempfile.TemporaryDirectory() as temp_dir:
             './aws/create_openshift_dev_user.py',
             '--keyfile', keyfile,
             '--outfile', './{}.gpg'.format(record['email']),
-            '--skip-account-create',
+            # '--skip-account-create',
             record['email']
         ])
