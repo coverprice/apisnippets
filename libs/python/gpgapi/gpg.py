@@ -6,12 +6,15 @@ import sys
 import tempfile
 from pprint import pprint
 
-
-class InvalidKeyException(Exception):
+class ApiException(Exception):
     pass
 
 
-class EncryptionFailureException(Exception):
+class InvalidKeyException(ApiException):
+    pass
+
+
+class EncryptionFailureException(ApiException):
     pass
 
 
