@@ -215,7 +215,7 @@ class UserFactory(object):
         if policy.require_numbers:
             chars += all_chars_in_range('0', '9')
         if policy.require_symbols:
-            chars += r'!@#$%^&*()_+-=[]{}|'     # This list was copied from AWS's UI
+            chars += list(r"!@#$%^&*()_+-=[]{}|'")     # This list was copied from AWS's UI
 
         if len(chars) == 0:
             raise Exception("Password policy gives us no password characters to choose from!")
