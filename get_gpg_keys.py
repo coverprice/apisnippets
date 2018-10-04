@@ -43,6 +43,8 @@ for row in values:
 with tempfile.TemporaryDirectory() as temp_dir:
     keyfile = os.path.join(temp_dir, 'keyfile')
     for record in records:
+        print("{name}\t\t{email}".format(name=record['name'], email=record['email']))
+
         with open(keyfile, 'w') as kf:
             kf.write(record['gpg_key'])
 
