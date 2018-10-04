@@ -60,6 +60,8 @@ def parse_args():
         help='GPG key file to import and encrypt with. (If not specified, output is unencrypted')
     parser.add_argument('-o', '--outfile', nargs='?', type=argparse.FileType('w'), default=sys.stdout,
         help='Output filename (default: stdout)')
+    parser.add_argument('--skip-account-create', action='store_true',
+        help="For debugging. Performs all non-AWS steps, but doesn't actually create the AWS account.")
     return parser.parse_args()
 
 
@@ -154,9 +156,10 @@ class FakeUserFactory(object):
 aws_session = awsapi.AwsSession.for_profile(profile_name=ACCOUNT_NAME)
 aws_account_id = aws_session.get_account_id()
 
-aws_user_factory = awsapi.UserFactory(awsapi.IamOperations.for_session(aws_session.session))
-# Uncomment me for testing
-# aws_user_factory = FakeUserFactory()
-
 args = parse_args()
+if args.skip_account_create:
+    aws_user_factory = FakeUserFactory()
+else:
+    aws_user_factory = awsapi.UserFactory(awsapi.IamOperations.for_session(aws_session.session))
+
 CreateUserWorkflow(args, aws_user_factory, aws_account_id).run()
