@@ -1,4 +1,11 @@
 #!/bin/env python3
+
+"
+boto3 & botocore are the AWS python API libraries. They can be installed with:
+
+$ sudo dnf install python3-boto3 python3-botocore
+"
+
 import boto3
 import botocore
 import sys
@@ -54,10 +61,22 @@ class IamOperations(object):
         return response['AccountAliases'][0]
 
 
-    def get_user_accounts(self):
+    def get_IAM_accounts(self):
         """
-        Given an IAM client and metadata about a specific account (a dict from get_accounts()),
-        get a list of all the IAM accounts within that account.
+        Return a list of all the IAM accounts within that account. Each list item looks like this:
+	(copied from https://boto3.amazonaws.com/v1/documentation/api/latest/reference/services/iam.html#IAM.Client.list_users)
+	    {
+		'Path': 'string',
+		'UserName': 'string',
+		'UserId': 'string',
+		'Arn': 'string',
+		'CreateDate': datetime(2015, 1, 1),
+		'PasswordLastUsed': datetime(2015, 1, 1),
+		'PermissionsBoundary': {
+		    'PermissionsBoundaryType': 'PermissionsBoundaryPolicy',
+		    'PermissionsBoundaryArn': 'string'
+		}
+	    }
         """
         user_paginator = self.iam_client.get_paginator('list_users')
         ret = []
@@ -73,6 +92,7 @@ class IamOperations(object):
                     'PasswordLastUsed': None,
                 }
             ]
+
         ret = sorted(ret, key=lambda rec:str.lower(rec['UserName']))
         return ret
 
@@ -211,3 +231,14 @@ class UserFactory(object):
             use_digits=policy.require_numbers,
             use_symbols=policy.require_symbols,
         )
+
+
+class FakeUserFactory(object):
+    """Replaces AWS UserFactory for use in tests"""
+    def create_user(self, username, group_names=[]):
+        return {
+            'username': username,
+            'password': 'abc123',
+            'access_key_id': 'some_access_key_id',
+            'secret_access_key': 'some_secret_access_key',
+        }

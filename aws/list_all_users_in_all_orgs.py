@@ -56,7 +56,7 @@ for account in active_accounts:
     iam_account_alias = iam_ops.get_account_alias()
     if iam_account_alias is None:
         iam_account_alias = '[None]'
-    iam_accounts = iam_ops.get_user_accounts()
+    iam_accounts = iam_ops.get_IAM_accounts()
 
     if len(iam_accounts) == 0:
         iam_accounts = [
