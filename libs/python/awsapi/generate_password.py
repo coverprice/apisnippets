@@ -18,13 +18,14 @@ def generate_password(
     def chars_in_range(lo : str, hi : str):
         return [chr(x) for x in range(ord(lo), ord(hi)+1)]
 
-    def add_chars(chars : list):
-        choose_from_chars += chars
+    def add_chars(chars : list) -> None:
+        choose_from_chars.extend(chars)
         # The new password must contain at least 1 character from this set, so add it here.
         new_password.append(secrets.choice(chars))
-        
+
     new_password = []
     choose_from_chars = []
+
     if use_lowercase:
         add_chars(chars_in_range('a', 'z'))
     if use_uppercase:

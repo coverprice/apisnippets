@@ -174,11 +174,9 @@ class UserFactory(object):
         @param username - username to create
         @param group_names - list of policy names to attach
         """
-        user = self._create_user_record(username=username)
-
-        self._attach_user_to_groups(user, group_names)
-
         password = self._generate_password()
+        user = self._create_user_record(username=username)
+        self._attach_user_to_groups(user, group_names)
         user.create_login_profile(Password=password, PasswordResetRequired=True)
 
         access_key_pair = user.create_access_key_pair()
