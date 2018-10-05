@@ -7,6 +7,8 @@ This defines the workflow for creating a set of users in AWS.
 import sys
 from pprint import pprint
 import os.path
+import logging
+logger = logging.getLogger(__name__)
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'libs', 'python'))
 import awsapi
 import ldapapi
@@ -48,6 +50,7 @@ class CreateUserWorkflow(object):
 
 
     def _preflight_checks(self, users_to_create : list) -> None:
+        logger.debug('Getting list of all IAM accounts')
         existing_aws_users = [
             user['UserName'].lower()
             for user in self.iam_operations.get_IAM_accounts()
@@ -57,6 +60,7 @@ class CreateUserWorkflow(object):
             self._retrieve_ldap_info(user)
 
             if user.gpg_key:
+                logger.debug('Testing GPG key for user "{}"'.format(user.user_id))
                 try:
                     gpgapi.encrypt('blah blah blah', user.gpg_key)
                 except gpgapi.ApiException as e:
@@ -107,6 +111,7 @@ class CreateUserWorkflow(object):
 
     def _create_users(self, users_to_create : list) -> None:
         for user in users_to_create:
+            logger.debug('Creating user: {}'.format(user.kerberos_id))
             aws_user_info = self.aws_user_factory.create_user(
                 username=user.kerberos_id,
                 group_names=["Dev"],
@@ -119,6 +124,7 @@ class CreateUserWorkflow(object):
             )
 
             if user.gpg_key:
+                logger.debug('Encrypting credentials message for user: {}'.format(user.kerberos_id))
                 user.output_message = gpgapi.encrypt(user.output_message, user.gpg_key)
 
 
@@ -139,6 +145,7 @@ class CreateUserWorkflow(object):
         @param User to create user_param - kerberos ID or email address
         @return the user's kerberos ID
         """
+        logger.debug('Retrieving LDAP info for user "{}"'.format(user.user_id))
         is_email = '@' in user.user_id
         if is_email and not user.user_id.endswith('@redhat.com'):
             user.add_error('Email addresses must end with @redhat.com : "{}"'.format(user.user_id))

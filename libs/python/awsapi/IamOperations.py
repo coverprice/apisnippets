@@ -1,10 +1,10 @@
 #!/bin/env python3
 
-"
+"""
 boto3 & botocore are the AWS python API libraries. They can be installed with:
 
 $ sudo dnf install python3-boto3 python3-botocore
-"
+"""
 
 import boto3
 import botocore
@@ -238,7 +238,7 @@ class FakeUserFactory(object):
     def create_user(self, username, group_names=[]):
         return {
             'username': username,
-            'password': 'abc123',
+            'password': 'some_password',
             'access_key_id': 'some_access_key_id',
             'secret_access_key': 'some_secret_access_key',
         }

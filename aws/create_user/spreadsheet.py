@@ -6,6 +6,8 @@ import os
 import os.path
 import tempfile
 import subprocess
+import logging
+logger = logging.getLogger(__name__)
 sys.path.append(os.path.join(os.path.dirname(__file__), 'libs', 'python'))
 import googledocsapi.api
 
@@ -17,12 +19,14 @@ class GoogleSheetsDataBridge(object):
             service_account_file : str,
         ):
         self.spreadsheet_id = spreadsheet_id
+        logger.debug('Connecting to Google Sheets API')
         self.service = googledocsapi.api.getSheetsService(
             service_account_file=service_account_file,
             read_only=True,         # TODO change this when we implement updating the status
         )
 
     def get_users(self) -> list:
+        logger.debug('Retrieving values from Google spreadsheet, id: {}'.format(self.spreadsheet_id))
         result = self.service.spreadsheets().values().get(
                 spreadsheetId=self.spreadsheet_id,
                 range='Form Responses 1!B2:I100',

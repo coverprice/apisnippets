@@ -18,6 +18,7 @@ import sys
 from pprint import pprint
 import create_user
 import argparse
+import logging
 import os.path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'libs', 'python'))
 import awsapi
@@ -31,6 +32,8 @@ def get_parser():
     parser = argparse.ArgumentParser(description='Creates an AWS user account in the {} account'.format(ACCOUNT_NAME))
     parser.add_argument('--skip-account-create', action='store_true',
         help="For debugging. Performs all non-AWS steps, but doesn't actually create the AWS account.")
+    parser.add_argument('--debug', action='store_true',
+        help="Print debugging messages.")
 
     subparsers = parser.add_subparsers(title="commands", dest="command")
 
@@ -83,14 +86,38 @@ def get_users_from_spreadsheet(args):
     users_to_create = spreadsheet_data_bridge.get_users()
 
     for user in users_to_create:
-        user.output_file = os.path.join(outdir, '{}.gpg'.format(user.email))
+        user.output_file = os.path.join(outdir, '{}.gpg'.format(user.user_id))
 
     return users_to_create
+
+def setup_logging(enable_debug=False):
+    logging.basicConfig(handlers=[logging.NullHandler()])
+
+    level = logging.INFO
+    if enable_debug:
+        level = logging.DEBUG
+
+    formatter = logging.Formatter(fmt='%(levelname)-8s: %(message)s')
+
+    handler = logging.StreamHandler()
+    handler.setLevel(level)
+    handler.setFormatter(formatter)
+
+    modules_to_debug = [
+        'create_user',
+        'ldapapi.LdapSession',
+    ]
+    for module in modules_to_debug:
+        mod_logger = logging.getLogger(module)
+        mod_logger.setLevel(level)
+        mod_logger.addHandler(handler)
 
 
 def main():
     parser = get_parser()
     args = parser.parse_args()
+
+    setup_logging(args.debug)
 
     aws_session = awsapi.AwsSession.for_profile(profile_name=ACCOUNT_NAME)
     aws_account_id = aws_session.get_account_id()

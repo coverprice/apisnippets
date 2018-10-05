@@ -13,6 +13,11 @@ class UserSearcher(object):
             session = LdapSession()
         self.session = session
 
+    def _get_search_base(self, search_deleted_users=False):
+        domain = ['dc=redhat', 'dc=com']
+        if search_deleted_users:
+            domain.append('ou=DeletedUsers')
+        return ','.join(domain)
 
     def find_by_uid(self, uid, search_deleted_users=False):
         """
@@ -20,7 +25,7 @@ class UserSearcher(object):
         """
         response = self.session.search(
             search_filter='(uid={})'.format(uid),
-            search_deleted_users=search_deleted_users,
+            search_base=self._get_search_base(search_deleted_users),
         )
         if response is None:
             return None
@@ -42,7 +47,7 @@ class UserSearcher(object):
             # It's possible to put all these into a single search criteria, but this is MUCH SLOWER.
             response = self.session.search(
                 search_filter='({attr}={email})'.format(attr=attr, email=email),
-                search_deleted_users=search_deleted_users,
+                search_base=self._get_search_base(search_deleted_users),
             )
             if response is not None:
                 return UserRecord.from_ldap_entry(response[0])

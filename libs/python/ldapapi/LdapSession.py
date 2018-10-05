@@ -6,6 +6,8 @@ ldap3 is a Python3 LDAP API. Install with:
 $ pip-3 install --upgrade ldap3
 """
 import ldap3
+import logging
+logger = logging.getLogger(__name__)
 from pprint import pprint
 
 # To get a list of all attributes, connect to the VPN and run something like this:
@@ -14,18 +16,16 @@ from pprint import pprint
 class LdapSession(object):
     def __init__(self):
         # Requires VPN connection to work.
-        self.conn = ldap3.Connection('ldap.corp.redhat.com', auto_bind=True)
+        ldap_host = 'ldap.corp.redhat.com'
+        logger.debug('Connecting to LDAP server: {}'.format(ldap_host))
+        self.conn = ldap3.Connection(ldap_host, auto_bind=True)
 
-    def search(self, search_filter, return_attributes=None, search_deleted_users=False):
-        domain = ['dc=redhat', 'dc=com']
-        if search_deleted_users:
-            domain.append('ou=DeletedUsers')
-
+    def search(self, search_filter, search_base, return_attributes=None):
         if return_attributes is None:
             return_attributes = ldap3.ALL_ATTRIBUTES
 
         found = self.conn.search(
-            search_base=','.join(domain),
+            search_base=search_base,
             search_filter=search_filter,
             attributes=return_attributes,
         )
