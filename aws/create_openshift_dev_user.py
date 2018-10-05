@@ -1,165 +1,126 @@
 #!/bin/env python3
 
 """
-This script uses the AWS APIs to list all AWS accounts in the organization, and all IAM accounts (users) in each account.
-It generates a CSV to stdout.
+This script creates a user in the openshift-dev AWS account. It takes a user (or set of users) and emits
+encrypted credentials + login information.
 
-It relies on a "coreosinc" profile being available in ~/.aws/credentials, which should map to the Master Account (aka Root Account).
+It has 2 modes of operation:
+1) 'user' - specify the username or user email, and optionally their GPG key on the command line
+2) 'spreadsheet' - Retrieve the username/keys from a specific Google Sheets spreadsheet
+
+Various pre-flight checks are made to ensure success:
+- the user will be verified against LDAP.
+- a trial GPG encryption (if a key is supplied)
+- the account doesn't already exist in AWS
 """
 
 import sys
-import csv
 from pprint import pprint
+import create_user
 import argparse
 import os.path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'libs/python'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'libs', 'python'))
 import awsapi
-import ldapapi
-import gpgapi
 
 ACCOUNT_NAME = "openshift-dev"
-TEMPLATE = """
-AWS account: {alias} ({account_id})
-URL: https://{alias}.signin.aws.amazon.com/console
-
-Username: {username}
-Initial password: {password}
-
-Run the following to update your ~/.aws/config & ~/.aws/credentials files:
-
-cat >> ~/.aws/config <<EOF
-[profile {alias}]
-region = us-east-1
-output = text
-EOF
-
-cat >> ~/.aws/credentials <<EOF
-[{alias}]
-aws_access_key_id = {access_key_id}
-aws_secret_access_key = {secret_access_key}
-EOF
-"""
-
-def gen_credentials_message(aws_user_info, aws_account_id, account_alias):
-    return TEMPLATE.format(
-        alias=account_alias,
-        account_id=aws_account_id,
-        username=aws_user_info['username'],
-        password=aws_user_info['password'],
-        access_key_id=aws_user_info['access_key_id'],
-        secret_access_key=aws_user_info['secret_access_key'],
-    ).lstrip()
+SPREADSHEET_ID = '1TxlsWyV970ct9EYaPrnSU5Ag7eTKw3Yfi2zfLsfqgxM'
+SERVICE_ACCOUNT_FILE = os.path.expanduser('~/.secrets/gcp_service_accounts/openshift-devproducti-3fd6f7ce7d12.json')
 
 
-def parse_args():
+def get_parser():
     parser = argparse.ArgumentParser(description='Creates an AWS user account in the {} account'.format(ACCOUNT_NAME))
-    parser.add_argument('username', action="store", help='Kerberos ID or email address of the user to add')
-    parser.add_argument('--skip-ldap-check', action='store_true',
-        help='Skips the LDAP lookup of the user. Only supported if a Kerberos ID is supplied as a username.')
-    parser.add_argument('-k', '--keyfile', nargs='?', type=argparse.FileType('r'), default=None,
-        help='GPG key file to import and encrypt with. (If not specified, output is unencrypted')
-    parser.add_argument('-o', '--outfile', nargs='?', type=argparse.FileType('w'), default=sys.stdout,
-        help='Output filename (default: stdout)')
     parser.add_argument('--skip-account-create', action='store_true',
         help="For debugging. Performs all non-AWS steps, but doesn't actually create the AWS account.")
-    return parser.parse_args()
+
+    subparsers = parser.add_subparsers(title="commands", dest="command")
+
+    # The "spreadsheet" sub-command
+    from_spreadsheet = subparsers.add_parser('spreadsheet')
+    from_spreadsheet.add_argument('-o', '--outdir', nargs='?', type=str, default=None,
+        help='Output directory to write credentials to.')
+
+    # The "user" sub-command
+    from_userid = subparsers.add_parser('user')
+    from_userid.add_argument('username', action="store",
+        help='Kerberos ID or email address of the user to add')
+    from_userid.add_argument('-k', '--keyfile', nargs='?', type=argparse.FileType('r'), default=None,
+        help='When a user is specified, this is the GPG key file to import and encrypt with. (If not specified, output is unencrypted')
+    from_userid.add_argument('-o', '--outfile', nargs='?', type=str, default=None,
+        help='Output filename (default: stdout)')
+
+    return parser
 
 
-def verify_kerberos_id(user_param : str, skip_ldap_check : bool) -> str:
-    """
-    @param user_param - kerberos ID or email address
-    @param skip_ldap_check - True to skip verifying a kerberos ID via LDAP
-    @return the user's kerberos ID
-    """
-    is_email = '@' in user_param
-    if is_email:
-        if not user_param.endswith('@redhat.com'):
-            raise Exception('Email addresses must end with @redhat.com')
+def get_user_from_cli_args(args) -> list:
+    # This means the CLI params specify a single user to create
+    gpg_key = None
+    if args.keyfile is not None:
+        gpg_key = args.keyfile.read()
 
-    if skip_ldap_check:
-        if is_email:
-            raise Exception('--skip-ldap-check is not compatible with specifying an email address')
-        return user_param
+    output_file = None
+    if args.outfile is not None:
+        output_file = args.outfile
 
-    user_searcher = ldapapi.UserSearcher()
-    if is_email:
-        user = user_searcher.find_by_email(user_param)
+    return create_user.UserToCreate(
+        user_id=args.username,
+        gpg_key=gpg_key,
+        output_file=output_file,
+    )
+
+
+def get_users_from_spreadsheet(args):
+    spreadsheet_data_bridge = create_user.GoogleSheetsDataBridge(
+        spreadsheet_id=SPREADSHEET_ID,
+        service_account_file=SERVICE_ACCOUNT_FILE,
+    )
+    outdir = args.outdir
+    if not outdir:
+        outdir = os.getcwd()
+    if not os.path.isdir(outdir):
+        print("Fatal error: Output dir '{}' is not a directory.".format(outdir), file=sys.stderr)
+        sys.exit(1)
+        
+    users_to_create = spreadsheet_data_bridge.get_users()
+
+    for user in users_to_create:
+        user.output_file = os.path.join(outdir, '{}.gpg'.format(user.email))
+
+    return users_to_create
+
+
+def main():
+    parser = get_parser()
+    args = parser.parse_args()
+
+    aws_session = awsapi.AwsSession.for_profile(profile_name=ACCOUNT_NAME)
+    aws_account_id = aws_session.get_account_id()
+    iam_operations = awsapi.IamOperations.for_session(aws_session.session)
+    if args.skip_account_create:
+        aws_user_factory = awsapi.FakeUserFactory()
     else:
-        user = user_searcher.find_by_uid(user_param)
-    if user is None:
-        raise Exception('Could not find user record "{}"'.format(user_param))
-    return user.uid.lower()
+        aws_user_factory = awsapi.UserFactory(iam_operations)
 
+    if args.command == 'spreadsheet':
+        users_to_create = get_users_from_spreadsheet(args)
+    elif args.command == 'user':
+        users_to_create = [get_user_from_cli_args(args)]
 
+    else:
+        parser.print_usage()
+        sys.exit(1)
 
-class CreateUserWorkflow(object):
-    def __init__(self, args, aws_user_factory, aws_account_id):
-        """
-        @param argparse.Namespace args
-        @param awsapi.UserFactory aws_user_factory
-        @param string aws_account_id - 12-digit account ID
-        """
-        self.args = args
+    workflow = create_user.CreateUserWorkflow(
+        aws_user_factory=aws_user_factory,
+        iam_operations=iam_operations,
+        aws_account_id=aws_account_id,
+        aws_account_alias=ACCOUNT_NAME,
+    )
+    workflow.run(users_to_create)
 
-        self.aws_user_factory = aws_user_factory
-        self.aws_account_id = aws_account_id
+    # TODO - update the spreadsheet to reflect that the users have been created.
+    # TODO - update the spreadsheet with GPG errors?
+    # TODO - Inspect GPG metadata and report errors like expired keys / multiple keys?
+    # if args.command == 'spreadsheet':
+    #    update_spreadsheet(users_to_create)
 
-        self.key = None
-        if self.args.keyfile is not None:
-            self.key = self.args.keyfile.read()
-
-        self.kerberos_id = None
-
-    def run(self):
-        self._preflight_checks()
-
-        aws_user_info = self.aws_user_factory.create_user(
-            username=self.kerberos_id,
-            group_names=["Dev"],
-        )
-
-        message = gen_credentials_message(
-            aws_user_info,
-            aws_session.get_account_id(),
-            account_alias=ACCOUNT_NAME,
-        )
-
-        if self.key is not None:
-            message = gpgapi.encrypt(message, self.key)
-
-        args.outfile.write(message)
-        return
-
-
-    def _preflight_checks(self):
-        self.kerberos_id = verify_kerberos_id(
-            user_param=self.args.username.lower().strip(),
-            skip_ldap_check=self.args.skip_ldap_check,
-        )
-        if self.key:
-            try:
-                gpgapi.encrypt('blah blah blah', self.key)
-            except gpgapi.ApiException:
-                raise
-
-
-class FakeUserFactory(object):
-    """Replaces AWS UserFactory for use in tests"""
-    def create_user(self, username, group_names=[]):
-        return {
-            'username': username,
-            'password': 'abc123',
-            'access_key_id': 'some_access_key_id',
-            'secret_access_key': 'some_secret_access_key',
-        }
-
-aws_session = awsapi.AwsSession.for_profile(profile_name=ACCOUNT_NAME)
-aws_account_id = aws_session.get_account_id()
-
-args = parse_args()
-if args.skip_account_create:
-    aws_user_factory = FakeUserFactory()
-else:
-    aws_user_factory = awsapi.UserFactory(awsapi.IamOperations.for_session(aws_session.session))
-
-CreateUserWorkflow(args, aws_user_factory, aws_account_id).run()
+main()
