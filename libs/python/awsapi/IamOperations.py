@@ -3,9 +3,9 @@ import boto3
 import botocore
 import sys
 import functools
-import secrets
 from pprint import pprint
 from .AwsSession import AwsSession
+from .generate_password import generate_password
 
 
 class IamOperations(object):
@@ -158,7 +158,7 @@ class UserFactory(object):
 
         self._attach_user_to_groups(user, group_names)
 
-        password = self._generate_new_password()
+        password = self._generate_password()
         user.create_login_profile(Password=password, PasswordResetRequired=True)
 
         access_key_pair = user.create_access_key_pair()
@@ -202,26 +202,12 @@ class UserFactory(object):
                 user.add_group(GroupName=group['GroupName'])
 
 
-    def _generate_new_password(self):
-        def all_chars_in_range(lo, hi):
-            return [chr(x) for x in range(ord(lo), ord(hi)+1)]
-
+    def _generate_password(self):
         policy = self.iam_ops.get_password_policy()
-        chars = []
-        if policy.require_lowercase_characters:
-            chars += all_chars_in_range('a', 'z')
-        if policy.require_uppercase_characters:
-            chars += all_chars_in_range('A', 'Z')
-        if policy.require_numbers:
-            chars += all_chars_in_range('0', '9')
-        if policy.require_symbols:
-            chars += list(r"!@#$%^&*()_+-=[]{}|'")     # This list was copied from AWS's UI
-
-        if len(chars) == 0:
-            raise Exception("Password policy gives us no password characters to choose from!")
-
-        new_password = ''
-        password_len = min(12, policy.minimum_password_length)
-        for _ in range(0, password_len):
-            new_password += secrets.choice(chars)        # This is cryptographically-safe
-        return new_password
+        return generate_password(
+            min_length=min(12, policy.minimum_password_length),
+            use_lowercase=policy.require_lowercase_characters,
+            use_uppercase=policy.require_uppercase_characters,
+            use_digits=policy.require_numbers,
+            use_symbols=policy.require_symbols,
+        )
