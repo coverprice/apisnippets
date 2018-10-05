@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
 
+"""
+ldap3 is a Python3 LDAP API. Install with:
+
+$ pip-3 install --upgrade ldap3
+"""
 import ldap3
 from pprint import pprint
 
