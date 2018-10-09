@@ -25,6 +25,8 @@ import awsapi
 
 ACCOUNT_NAME = "openshift-dev"
 SPREADSHEET_ID = '1TxlsWyV970ct9EYaPrnSU5Ag7eTKw3Yfi2zfLsfqgxM'
+# The following spreadsheet is a copy of the original, used for testing.
+# SPREADSHEET_ID = '1SQtqxKN6GU-zjXOYlPbrDUUrnQmRKBmVu-7vuDvS2g8'
 SERVICE_ACCOUNT_FILE = os.path.expanduser('~/.secrets/gcp_service_accounts/openshift-devproducti-3fd6f7ce7d12.json')
 
 
@@ -54,41 +56,62 @@ def get_parser():
     return parser
 
 
-def get_user_from_cli_args(args) -> list:
-    # This means the CLI params specify a single user to create
+def cli_workflow(args, workflow):
+    # get user from cli args(args)
     gpg_key = None
     if args.keyfile is not None:
         gpg_key = args.keyfile.read()
 
-    output_file = None
-    if args.outfile is not None:
-        output_file = args.outfile
 
-    return create_user.UserToCreate(
+    user_to_create = create_user.UserToCreate(
         user_id=args.username,
         gpg_key=gpg_key,
         output_file=output_file,
     )
 
+    created_users = workflow.run([user_to_create])
 
-def get_users_from_spreadsheet(args):
-    spreadsheet_data_bridge = create_user.GoogleSheetsDataBridge(
-        spreadsheet_id=SPREADSHEET_ID,
-        service_account_file=SERVICE_ACCOUNT_FILE,
-    )
+    if not len(created_users):
+        return
+
+    user = created_users[0]
+    if args.outfile is None:
+        sys.stdout.write("{email}\n{message}\n\n".format(
+            email=user.email,
+            message=user.output_message,
+        ))
+    else:
+        with open(args.outfile, 'w') as fh:
+            fh.write(user.output_message)
+
+
+def spreadsheet_workflow(args, workflow):
     outdir = args.outdir
     if not outdir:
         outdir = os.getcwd()
     if not os.path.isdir(outdir):
         print("Fatal error: Output dir '{}' is not a directory.".format(outdir), file=sys.stderr)
         sys.exit(1)
-        
-    users_to_create = spreadsheet_data_bridge.get_users()
 
-    for user in users_to_create:
-        user.output_file = os.path.join(outdir, '{}.gpg'.format(user.user_id))
+    spreadsheet_data_bridge = create_user.GoogleSheetsDataBridge(
+        spreadsheet_id=SPREADSHEET_ID,
+        service_account_file=SERVICE_ACCOUNT_FILE,
+    )
+    spreadsheet_data_bridge.fix_up_user_status()
+    users_to_create = spreadsheet_data_bridge.get_users_to_create()
 
-    return users_to_create
+    created_users = workflow.run(users_to_create)
+
+    for user in created_users:
+        output_file = os.path.join(outdir, '{}.gpg'.format(user.user_id))
+        with open(output_file, 'w') as fh:
+            fh.write(user.output_message)
+
+    created_users = workflow.run(users_to_create)
+
+    spreadsheet_data_bridge.update_user_status(created_users)
+    # TODO - update the spreadsheet with any pre-flight check errors
+
 
 def setup_logging(enable_debug=False):
     logging.basicConfig(handlers=[logging.NullHandler()])
@@ -113,12 +136,7 @@ def setup_logging(enable_debug=False):
         mod_logger.addHandler(handler)
 
 
-def main():
-    parser = get_parser()
-    args = parser.parse_args()
-
-    setup_logging(args.debug)
-
+def get_workflow(args):
     aws_session = awsapi.AwsSession.for_profile(profile_name=ACCOUNT_NAME)
     aws_account_id = aws_session.get_account_id()
     iam_operations = awsapi.IamOperations.for_session(aws_session.session)
@@ -127,27 +145,27 @@ def main():
     else:
         aws_user_factory = awsapi.UserFactory(iam_operations)
 
-    if args.command == 'spreadsheet':
-        users_to_create = get_users_from_spreadsheet(args)
-    elif args.command == 'user':
-        users_to_create = [get_user_from_cli_args(args)]
-
-    else:
-        parser.print_usage()
-        sys.exit(1)
-
-    workflow = create_user.CreateUserWorkflow(
+    return create_user.CreateUserWorkflow(
         aws_user_factory=aws_user_factory,
         iam_operations=iam_operations,
         aws_account_id=aws_account_id,
         aws_account_alias=ACCOUNT_NAME,
     )
-    workflow.run(users_to_create)
 
-    # TODO - update the spreadsheet to reflect that the users have been created.
-    # TODO - update the spreadsheet with GPG errors?
-    # TODO - Inspect GPG metadata and report errors like expired keys / multiple keys?
-    # if args.command == 'spreadsheet':
-    #    update_spreadsheet(users_to_create)
+
+def main():
+    parser = get_parser()
+    args = parser.parse_args()
+
+    setup_logging(args.debug)
+    workflow = get_workflow(args)
+
+    if args.command == 'spreadsheet':
+        spreadsheet_workflow(args, workflow)
+    elif args.command == 'user':
+        cli_workflow(args, workflow)
+    else:
+        parser.print_usage()
+        sys.exit(1)
 
 main()

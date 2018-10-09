@@ -9,9 +9,23 @@ import subprocess
 import logging
 logger = logging.getLogger(__name__)
 sys.path.append(os.path.join(os.path.dirname(__file__), 'libs', 'python'))
-import googledocsapi.api
+import googledocsapi
 
 from .UserToCreate import UserToCreate
+
+SHEET_NAME = 'Form Responses 1'
+MIN_ROW = 2
+MAX_ROW = 100       # The largest row # to process
+STATUS_COLUMN = 'I'
+
+def get_cell_range(left_col, right_col):
+   return '{sheet_name}!{left_col}{min_row}:{right_col}{max_row}'.format(
+        sheet_name=SHEET_NAME,
+        left_col=left_col,
+        min_row=MIN_ROW,
+        right_col=right_col,
+        max_row=MAX_ROW,
+    )
 
 class GoogleSheetsDataBridge(object):
     def __init__(self,
@@ -20,46 +34,75 @@ class GoogleSheetsDataBridge(object):
         ):
         self.spreadsheet_id = spreadsheet_id
         logger.debug('Connecting to Google Sheets API')
-        self.service = googledocsapi.api.getSheetsService(
+        self.service = googledocsapi.SheetService.new_instance(
+            spreadsheet_id=spreadsheet_id,
             service_account_file=service_account_file,
-            read_only=True,         # TODO change this when we implement updating the status
         )
 
-    def get_users(self) -> list:
-        logger.debug('Retrieving values from Google spreadsheet, id: {}'.format(self.spreadsheet_id))
-        result = self.service.spreadsheets().values().get(
-                spreadsheetId=self.spreadsheet_id,
-                range='Form Responses 1!B2:I100',
-            ).execute()
-        values = result.get('values', [])
-        if not values:
-            return []
+
+    def fix_up_user_status(self) -> None:
+        """
+        When a user is added to the row by the Google Form, the Status column is blank (because that's not part of the form).
+        This method reads in the Status column and populates any missing ones.
+        """
+        logger.debug('Fixing up the status values , id: {}'.format(self.service.spreadsheet_id))
+        cells = self.service.read_cells(cell_range=get_cell_range(STATUS_COLUMN, STATUS_COLUMN))
+
+        write_buffer = googledocsapi.SheetWriteBuffer()
+        for row_idx in range(0, cells.height()):
+            status = cells.get_cell(row_idx, 0)
+            if status is None or status == '':
+                write_buffer.set(
+                    cell=cells.get_relative_cell(row_idx=row_idx,  col_idx=0),
+                    value='In Review',
+                )
+        if write_buffer.num_pending_writes():
+            logger.debug('Updating {} user status cells.'.format(write_buffer.num_pending_writes()))
+            self.service.update_cells(write_buffer)
+
+
+    def get_users_to_create(self) -> list:
+        logger.debug('Retrieving values from Google spreadsheet, id: {}'.format(self.service.spreadsheet_id))
+        cells = self.service.read_cells(cell_range=get_cell_range('B', STATUS_COLUMN))
 
         users_to_create = []
-        for row in values:
-            if len(row) < 8:
-                # (Probably) empty row
+        for row_idx in range(0, cells.height()):
+            email = cells.get_cell(row_idx, 0)
+            if email is None or email == '':
+                # No email address, so ignore this row.
+                continue
+            email = email.lower().strip()
+
+            status = cells.get_cell(row_idx, 7)
+            if status != 'Approved-but-not-created':
                 continue
 
-            # TODO - new rows are created with a blank column, not 'In Review'. In the post-run phase (or perhaps right now?) these should be updated
-            # to be the default: 'In Review'
-            status = row[7] if len(row) >= 8 else 'In Review'
-
-            if status not in ['In Review', 'Approved-but-not-created']:
-                continue
-
-            email = row[0].lower().strip()
-            if email == '':
-                continue
-
-            gpg_key = row[6]
+            gpg_key = cells.get_cell(row_idx, 6)
             if "-----BEGIN PGP PUBLIC KEY BLOCK-----" not in gpg_key:
                 gpg_key = None
 
-            # TODO - if we want to update the user, we'll have to add the sheet row # into the object.
+            # TODO - if we want to update the user status, we'll have to add the sheet row # into the object.
             users_to_create.append(UserToCreate(
                 user_id=email,
                 gpg_key=gpg_key,
                 output_file=None,
+                spreadsheet_row=row_idx + 2,
             ))
         return users_to_create
+
+
+    def update_user_status(self, created_users : list) -> None:
+        """
+        After an account is successfully created, update the 'Status' column in the spreadsheet.
+        """
+        logger.debug('Updating the spreadsheet to reflect the new User status.')
+        write_buffer = googledocsapi.SheetWriteBuffer()
+        for user in created_users:
+            assert(user.spreadsheet_row is not None)
+            write_buffer.set(
+                cell= googledocsapi.CellRange(sheet=SHEET_NAME, top_left_col=STATUS_COLUMN, top_left_row=user.spreadsheet_row),
+                value='Account created',
+            )
+        if write_buffer.num_pending_writes():
+            logger.debug('Updating {} user status cells.'.format(write_buffer.num_pending_writes()))
+            self.service.update_cells(write_buffer)

@@ -8,11 +8,11 @@ class UserToCreate(object):
     def __init__(self,
             user_id : str,          # This is either the Kerberos ID or an email address
             gpg_key : str = None,   # ASCII-armored GPG key (or None for plaintext)
-            output_file=None,       # File path for output (or None for stdout)
+            spreadsheet_row=None,   # The row number from the spreadsheet that this user record came from
         ):
         self.user_id = user_id
         self.gpg_key = gpg_key
-        self.output_file = output_file
+        self.spreadsheet_row = spreadsheet_row
 
         self.kerberos_id = None
         self.email = None

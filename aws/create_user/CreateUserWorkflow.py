@@ -29,7 +29,7 @@ class CreateUserWorkflow(object):
         @param aws_user_factory awsapi.UserFactory
         @param iam_operations awsapi.IamOperations
         @param aws_account_id - 12-digit account ID
-        @param aws_account_id - alias for the 12-digit account ID (if there is one)
+        @param aws_account_alias - alias for the 12-digit account ID (if there is one)
         """
         self.aws_user_factory = aws_user_factory
         self.iam_operations = iam_operations
@@ -38,15 +38,16 @@ class CreateUserWorkflow(object):
         self.ldap_user_searcher = ldapapi.UserSearcher()
 
 
-    def run(self, users_to_create : list):
+    def run(self, users_to_create : list) -> list:
         """
         @param users_to_create [UsersToCreate]
+        @return [UsersToCreate] - the users that were actually created
         """
         self._preflight_checks(users_to_create)
         go_users = self._decide_go_nogo(users_to_create)
 
         self._create_users(go_users)
-        self._output_credentials(go_users)
+        return go_users
 
 
     def _preflight_checks(self, users_to_create : list) -> None:
@@ -126,18 +127,6 @@ class CreateUserWorkflow(object):
             if user.gpg_key:
                 logger.debug('Encrypting credentials message for user: {}'.format(user.kerberos_id))
                 user.output_message = gpgapi.encrypt(user.output_message, user.gpg_key)
-
-
-    def _output_credentials(self, users_to_create : list) -> None:
-        for user in users_to_create:
-            if user.output_file is None:
-                sys.stdout.write("{email}\n{message}\n\n".format(
-                    email=user.email,
-                    message=user.output_message,
-                ))
-            else:
-                with open(user.output_file, 'w') as fh:
-                    fh.write(user.output_message)
 
 
     def _retrieve_ldap_info(self, user : UserToCreate) -> None:
