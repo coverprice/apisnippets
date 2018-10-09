@@ -8,10 +8,14 @@ from .IamOperations import (
     UserFactory,
     FakeUserFactory,
 )
+from .Route53Operations import (
+    Route53Operations,
+)
 __all__ = [
     'AwsSession',
     'IamOperations',
     'RecordExistsException',
     'UserFactory',
     'FakeUserFactory',
+    'Route53Operations',
 ]
