@@ -11,12 +11,16 @@ logger = logging.getLogger(__name__)
 sys.path.append(os.path.join(os.path.dirname(__file__), 'libs', 'python'))
 import googledocsapi
 
-from .UserToCreate import UserToCreate
+from .UserToCreate import (
+    UserToCreate,
+    UserCreateStatus,
+)
 
 SHEET_NAME = 'Form Responses 1'
 MIN_ROW = 2
 MAX_ROW = 100       # The largest row # to process
 STATUS_COLUMN = 'I'
+ERROR_NOTES_COLUMN = 'J'
 
 def get_cell_range(left_col, right_col):
    return '{sheet_name}!{left_col}{min_row}:{right_col}{max_row}'.format(
@@ -85,24 +89,38 @@ class GoogleSheetsDataBridge(object):
             users_to_create.append(UserToCreate(
                 user_id=email,
                 gpg_key=gpg_key,
-                output_file=None,
                 spreadsheet_row=row_idx + 2,
             ))
         return users_to_create
 
 
-    def update_user_status(self, created_users : list) -> None:
+    def update_user_status(self, users : list) -> None:
         """
         After an account is successfully created, update the 'Status' column in the spreadsheet.
         """
+
+        def update_status(user, new_value):
+            write_buffer.set(
+                cell=googledocsapi.CellRange(sheet=SHEET_NAME, top_left_col=STATUS, top_left_row=user.spreadsheet_row),
+                value=new_value,
+            )
+
+        def update_error_notes(user, new_value):
+            write_buffer.set(
+                cell=googledocsapi.CellRange(sheet=SHEET_NAME, top_left_col=ERROR_NOTES_COLUMN, top_left_row=user.spreadsheet_row),
+                value=new_value,
+            )
+
         logger.debug('Updating the spreadsheet to reflect the new User status.')
         write_buffer = googledocsapi.SheetWriteBuffer()
-        for user in created_users:
+        for user in users:
             assert(user.spreadsheet_row is not None)
-            write_buffer.set(
-                cell= googledocsapi.CellRange(sheet=SHEET_NAME, top_left_col=STATUS_COLUMN, top_left_row=user.spreadsheet_row),
-                value='Account created',
-            )
+            if user.status == UserCreateStatus.ACCOUNT_CREATED:
+                update_status('Account created')
+                update_error_notes(user, None)
+            elif user.status == UserCreateStatus.FAILED_PREFLIGHT_CHECK:
+                update_error_notes(user, ', '.join(user.errors))
+
         if write_buffer.num_pending_writes():
             logger.debug('Updating {} user status cells.'.format(write_buffer.num_pending_writes()))
             self.service.update_cells(write_buffer)

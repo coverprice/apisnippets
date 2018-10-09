@@ -63,18 +63,16 @@ def cli_workflow(args, workflow):
         gpg_key = args.keyfile.read()
 
 
-    user_to_create = create_user.UserToCreate(
+    user = create_user.UserToCreate(
         user_id=args.username,
         gpg_key=gpg_key,
         output_file=output_file,
     )
 
-    created_users = workflow.run([user_to_create])
-
-    if not len(created_users):
+    workflow.run([user])
+    if user.status != create_user.UserCreateStatus.ACCOUNT_CREATED:
         return
 
-    user = created_users[0]
     if args.outfile is None:
         sys.stdout.write("{email}\n{message}\n\n".format(
             email=user.email,
@@ -100,17 +98,15 @@ def spreadsheet_workflow(args, workflow):
     spreadsheet_data_bridge.fix_up_user_status()
     users_to_create = spreadsheet_data_bridge.get_users_to_create()
 
-    created_users = workflow.run(users_to_create)
+    workflow.run(users_to_create)
 
-    for user in created_users:
-        output_file = os.path.join(outdir, '{}.gpg'.format(user.user_id))
-        with open(output_file, 'w') as fh:
-            fh.write(user.output_message)
+    for user in users_to_create:
+        if user.status == create_user.UserCreateStatus.ACCOUNT_CREATED:
+            output_file = os.path.join(outdir, '{}.gpg'.format(user.user_id))
+            with open(output_file, 'w') as fh:
+                fh.write(user.output_message)
 
-    created_users = workflow.run(users_to_create)
-
-    spreadsheet_data_bridge.update_user_status(created_users)
-    # TODO - update the spreadsheet with any pre-flight check errors
+    spreadsheet_data_bridge.update_user_status(users_to_create)
 
 
 def setup_logging(enable_debug=False):
