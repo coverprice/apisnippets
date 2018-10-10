@@ -6,10 +6,8 @@ This defines the workflow for creating a set of users in AWS.
 
 import sys
 from pprint import pprint
-import os.path
 import logging
 logger = logging.getLogger(__name__)
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'libs', 'python'))
 import awsapi
 import ldapapi
 import gpgapi

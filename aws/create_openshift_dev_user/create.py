@@ -20,20 +20,18 @@ import create_user
 import argparse
 import logging
 import os.path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'libs', 'python'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'libs', 'python'))
 import awsapi
 
-ACCOUNT_NAME = "openshift-dev"
+AWS_ACCOUNT_PROFILE_NAME = "openshift-dev"
 SPREADSHEET_ID = '1TxlsWyV970ct9EYaPrnSU5Ag7eTKw3Yfi2zfLsfqgxM'
 # The following spreadsheet is a copy of the original, used for testing.
 # SPREADSHEET_ID = '1SQtqxKN6GU-zjXOYlPbrDUUrnQmRKBmVu-7vuDvS2g8'
-SERVICE_ACCOUNT_FILE = os.path.expanduser('~/.secrets/gcp_service_accounts/openshift-devproducti-3fd6f7ce7d12.json')
-
 
 def get_parser():
-    parser = argparse.ArgumentParser(description='Creates an AWS user account in the {} account'.format(ACCOUNT_NAME))
-    parser.add_argument('--skip-account-create', action='store_true',
-        help="For debugging. Performs all non-AWS steps, but doesn't actually create the AWS account.")
+    parser = argparse.ArgumentParser(description='Creates an AWS user account in the {} account'.format(AWS_ACCOUNT_PROFILE_NAME))
+    parser.add_argument('--dry-run', action='store_true',
+        help="Perform all actions but don't create the AWS account or update the spreadsheet.")
     parser.add_argument('--debug', action='store_true',
         help="Print debugging messages.")
 
@@ -43,6 +41,9 @@ def get_parser():
     from_spreadsheet = subparsers.add_parser('spreadsheet')
     from_spreadsheet.add_argument('-o', '--outdir', nargs='?', type=str, default=None,
         help='Output directory to write credentials to.')
+    from_spreadsheet.add_argument('--gcp-credentials-file', nargs='?', type=str,
+        default=os.path.expanduser('~/.secrets/gcp_service_accounts/openshift-devproductivity-bot.json'),
+        help="Path to Google Service Account credentials file")
 
     # The "user" sub-command
     from_userid = subparsers.add_parser('user')
@@ -79,8 +80,9 @@ def cli_workflow(args, workflow):
             message=user.output_message,
         ))
     else:
-        with open(args.outfile, 'w') as fh:
-            fh.write(user.output_message)
+        if not args.dry_run:
+            with open(args.outfile, 'w') as fh:
+                fh.write(user.output_message)
 
 
 def spreadsheet_workflow(args, workflow):
@@ -91,22 +93,28 @@ def spreadsheet_workflow(args, workflow):
         print("Fatal error: Output dir '{}' is not a directory.".format(outdir), file=sys.stderr)
         sys.exit(1)
 
+    if not os.path.isfile(args.gcp_credentials_file):
+        print("Fatal error: GCP credentials file '{}' is not a file.".format(args.gcp_credentials_file), file=sys.stderr)
+        sys.exit(1)
+
     spreadsheet_data_bridge = create_user.GoogleSheetsDataBridge(
         spreadsheet_id=SPREADSHEET_ID,
-        service_account_file=SERVICE_ACCOUNT_FILE,
+        service_account_file=args.gcp_credentials_file,
     )
-    spreadsheet_data_bridge.fix_up_user_status()
+    if not args.dry_run:
+        spreadsheet_data_bridge.fix_up_user_status()
     users_to_create = spreadsheet_data_bridge.get_users_to_create()
 
     workflow.run(users_to_create)
 
-    for user in users_to_create:
-        if user.status == create_user.UserCreateStatus.ACCOUNT_CREATED:
-            output_file = os.path.join(outdir, '{}.gpg'.format(user.user_id))
-            with open(output_file, 'w') as fh:
-                fh.write(user.output_message)
+    if not args.dry_run:
+        for user in users_to_create:
+            if user.status == create_user.UserCreateStatus.ACCOUNT_CREATED:
+                output_file = os.path.join(outdir, '{}.gpg'.format(user.email))
+                with open(output_file, 'w') as fh:
+                    fh.write(user.output_message)
 
-    spreadsheet_data_bridge.update_user_status(users_to_create)
+        spreadsheet_data_bridge.update_user_status(users_to_create)
 
 
 def setup_logging(enable_debug=False):
@@ -133,10 +141,10 @@ def setup_logging(enable_debug=False):
 
 
 def get_workflow(args):
-    aws_session = awsapi.AwsSession.for_profile(profile_name=ACCOUNT_NAME)
+    aws_session = awsapi.AwsSession.for_profile(profile_name=AWS_ACCOUNT_PROFILE_NAME)
     aws_account_id = aws_session.get_account_id()
     iam_operations = awsapi.IamOperations.for_session(aws_session.session)
-    if args.skip_account_create:
+    if args.dry_run:
         aws_user_factory = awsapi.FakeUserFactory()
     else:
         aws_user_factory = awsapi.UserFactory(iam_operations)
@@ -145,7 +153,7 @@ def get_workflow(args):
         aws_user_factory=aws_user_factory,
         iam_operations=iam_operations,
         aws_account_id=aws_account_id,
-        aws_account_alias=ACCOUNT_NAME,
+        aws_account_alias=AWS_ACCOUNT_PROFILE_NAME,
     )
 
 

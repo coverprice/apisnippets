@@ -1,14 +1,10 @@
 #!/bin/env python3
 
 from pprint import pprint
-import sys
-import os
-import os.path
 import tempfile
 import subprocess
 import logging
 logger = logging.getLogger(__name__)
-sys.path.append(os.path.join(os.path.dirname(__file__), 'libs', 'python'))
 import googledocsapi
 
 from .UserToCreate import (
