@@ -112,7 +112,7 @@ class GoogleSheetsDataBridge(object):
         for user in users:
             assert(user.spreadsheet_row is not None)
             if user.status == UserCreateStatus.ACCOUNT_CREATED:
-                update_status('Account created')
+                update_status(user, 'Account created')
                 update_error_notes(user, None)
             elif user.status == UserCreateStatus.FAILED_PREFLIGHT_CHECK:
                 update_error_notes(user, ', '.join(user.errors))
