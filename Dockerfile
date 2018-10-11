@@ -14,6 +14,7 @@ RUN dnf update \
   pip-3 install --upgrade \
     google-oauth \
     google-api-python-client \
+    google-auth-oauthlib \
     ldap3
 
 COPY . /tools
