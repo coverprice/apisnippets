@@ -6,8 +6,8 @@ from pprint import pprint
 import argparse
 import sys
 import os.path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'libs/python'))
-import ldapapi
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'libs', 'python'))
+import dpp.ldap
 
 def parse_args():
     parser = argparse.ArgumentParser(description='Searches for an LDAP user by uid or email')
@@ -18,7 +18,7 @@ args = parse_args()
 
 criteria = args.criteria.lower().strip()
 
-user_searcher = ldapapi.UserSearcher()
+user_searcher = dpp.ldap.UserSearcher()
 if criteria.endswith('@redhat.com'):
     user = user_searcher.find_by_email(criteria)
 else:

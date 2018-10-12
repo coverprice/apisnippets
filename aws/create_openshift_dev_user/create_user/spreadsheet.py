@@ -5,7 +5,7 @@ import tempfile
 import subprocess
 import logging
 logger = logging.getLogger(__name__)
-import googledocsapi
+import dpp.google
 
 from .UserToCreate import (
     UserToCreate,
@@ -34,7 +34,7 @@ class GoogleSheetsDataBridge(object):
         ):
         self.spreadsheet_id = spreadsheet_id
         logger.debug('Connecting to Google Sheets API')
-        self.service = googledocsapi.SheetService.new_instance(
+        self.service = dpp.google.SheetService.new_instance(
             spreadsheet_id=spreadsheet_id,
             service_account_file=service_account_file,
         )
@@ -48,7 +48,7 @@ class GoogleSheetsDataBridge(object):
         logger.debug('Fixing up the status values , id: {}'.format(self.service.spreadsheet_id))
         cells = self.service.read_cells(cell_range=get_cell_range(STATUS_COLUMN, STATUS_COLUMN))
 
-        write_buffer = googledocsapi.SheetWriteBuffer()
+        write_buffer = dpp.google.SheetWriteBuffer()
         for row_idx in range(0, cells.height()):
             status = cells.get_cell(row_idx, 0)
             if status is None or status == '':
@@ -97,18 +97,18 @@ class GoogleSheetsDataBridge(object):
 
         def update_status(user, new_value):
             write_buffer.set(
-                cell=googledocsapi.CellRange(sheet=SHEET_NAME, top_left_col=STATUS, top_left_row=user.spreadsheet_row),
+                cell=dpp.google.CellRange(sheet=SHEET_NAME, top_left_col=STATUS, top_left_row=user.spreadsheet_row),
                 value=new_value,
             )
 
         def update_error_notes(user, new_value):
             write_buffer.set(
-                cell=googledocsapi.CellRange(sheet=SHEET_NAME, top_left_col=ERROR_NOTES_COLUMN, top_left_row=user.spreadsheet_row),
+                cell=dpp.google.CellRange(sheet=SHEET_NAME, top_left_col=ERROR_NOTES_COLUMN, top_left_row=user.spreadsheet_row),
                 value=new_value,
             )
 
         logger.debug('Updating the spreadsheet to reflect the new User status.')
-        write_buffer = googledocsapi.SheetWriteBuffer()
+        write_buffer = dpp.google.SheetWriteBuffer()
         for user in users:
             assert(user.spreadsheet_row is not None)
             if user.status == UserCreateStatus.ACCOUNT_CREATED:

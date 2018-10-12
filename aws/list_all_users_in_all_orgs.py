@@ -12,7 +12,7 @@ import csv
 from pprint import pprint
 import os.path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'libs/python'))
-import awsapi
+import dpp.aws
 
 # Important: In AWS, "account" refers to a resource container (VMs, networks, etc), and "IAM account" refers to (typically) a person.
 # "IAM accounts" (also referred to as "users") are contained within "accounts".
@@ -23,7 +23,7 @@ import awsapi
 # AWS Root Account ID - This is the master account. Sub-accounts are organized in a hierarchy using AWS Organizations.
 ROOT_ACCOUNT_ID = '595879546273'
 
-aws_session = awsapi.AwsSession.for_profile(profile_name="coreosinc")
+aws_session = dpp.aws.AwsSession.for_profile(profile_name="coreosinc")
 accounts = aws_session.get_accounts()
 active_accounts = [ acct for acct in accounts if acct['Status'] == 'ACTIVE' ]
 
@@ -46,12 +46,12 @@ csvout.writerow([
 
 for account in active_accounts:
     if account['Id'] == ROOT_ACCOUNT_ID:
-        iam_ops = awsapi.IamOperations.for_session(aws_session=aws_session)
+        iam_ops = dpp.aws.IamOperations.for_session(aws_session=aws_session)
     else:
         sts_token = aws_session.get_sts_token_for_account(ROOT_ACCOUNT_ID, account['Id'])
         if sts_token is None:
             raise Exception("Could not get STS token for {}".format(account['Name']))
-        iam_ops = awsapi.IamOperations.for_account(aws_session=aws_session, credentials=sts_token['Credentials'])
+        iam_ops = dpp.aws.IamOperations.for_account(aws_session=aws_session, credentials=sts_token['Credentials'])
 
     iam_account_alias = iam_ops.get_account_alias()
     if iam_account_alias is None:

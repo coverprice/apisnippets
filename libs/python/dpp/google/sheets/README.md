@@ -121,24 +121,22 @@ Use this to configure the API, as shown in the following sample code.
 
 Note: This imports the api.py file in this directory, which encapsulates a lot of the setup.
 
-    import googledocsapi.api
+    import dpp.google
     SPREADSHEET_ID = '1gtXz1XtjsMlkDolh6RfHykS6RoJqQ7loBqz4riCVPNA'
     SERVICE_ACCOUNT_FILE = '/path/to/some-service-account.json'
     
-    service = googledocsapi.api.getSheetsService(
+	service = dpp.google.SheetService.new_instance(
+		spreadsheet_id=SPREADSHEET_ID,
         service_account_file=SERVICE_ACCOUNT_FILE,
-        read_only=True,
-    )
+	)
 
     # Call the Sheets API
-    result = service.spreadsheets().values().get(
-            spreadsheetId=SPREADSHEET_ID,
-            range='Sheet1!A2:E2',
-        ).execute()
-    values = result.get('values', [])
-    if not values:
-        print('No data found.')
-    else:
-        for row in values:
-            # Print columns A and E, which correspond to indices 0 and 4.
-            print('{}, {}'.format(row[0], row[4]))
+	cells = service.read_cells(cell_range='Form Responses 1!B2:I8')
+	records = []
+	for row_idx in range(0, cells.height()):
+		records.append({
+			'email': cells.get_cell(row_idx, 0),
+			'name': cells.get_cell(row_idx, 4),
+			'gpg_key': cells.get_cell(row_idx, 6),
+			'status': cells.get_cell(row_idx, 7),
+		})

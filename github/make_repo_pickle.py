@@ -1,14 +1,15 @@
 #!/bin/env python3
 
 from pprint import pprint
-import sys
 import pickle
-import os
+import sys
+import os.path
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'libs', 'python'))
 
-import githubapi.api
+import dpp.github
 
 def main():
-    repos = githubapi.api.get_repos("coreos") + githubapi.api.get_repos("coreos-inc")
+    repos = dpp.github.api.get_repos("coreos") + dpp.github.api.get_repos("coreos-inc")
     repos = sorted(repos, key=lambda x: x['name'])
     print(len(repos))
     pprint(repos)

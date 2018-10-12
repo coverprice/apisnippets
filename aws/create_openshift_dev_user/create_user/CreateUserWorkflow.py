@@ -8,9 +8,9 @@ import sys
 from pprint import pprint
 import logging
 logger = logging.getLogger(__name__)
-import awsapi
-import ldapapi
-import gpgapi
+import dpp.aws
+import dpp.ldap
+import dpp.gpg
 
 from .message import gen_credentials_message
 from .UserToCreate import (
@@ -22,13 +22,13 @@ from .UserToCreate import (
 class CreateUserWorkflow(object):
     def __init__(self,
             aws_user_factory,
-            iam_operations : awsapi.IamOperations,
+            iam_operations : dpp.aws.IamOperations,
             aws_account_id : str,
             aws_account_alias : str,
         ):
         """
-        @param aws_user_factory awsapi.UserFactory
-        @param iam_operations awsapi.IamOperations
+        @param aws_user_factory dpp.aws.UserFactory
+        @param iam_operations dpp.aws.IamOperations
         @param aws_account_id - 12-digit account ID
         @param aws_account_alias - alias for the 12-digit account ID (if there is one)
         """
@@ -36,7 +36,7 @@ class CreateUserWorkflow(object):
         self.iam_operations = iam_operations
         self.aws_account_id = aws_account_id
         self.aws_account_alias = aws_account_alias
-        self.ldap_user_searcher = ldapapi.UserSearcher()
+        self.ldap_user_searcher = dpp.ldap.UserSearcher()
 
 
     def run(self, users_to_create : list):
@@ -62,8 +62,8 @@ class CreateUserWorkflow(object):
             if user.gpg_key:
                 logger.debug('Testing GPG key for user "{}"'.format(user.user_id))
                 try:
-                    gpgapi.encrypt('blah blah blah', user.gpg_key)
-                except gpgapi.ApiException as e:
+                    dpp.gpg.encrypt('blah blah blah', user.gpg_key)
+                except dpp.gpg.ApiException as e:
                     user.add_error('Failed test encryption on key: ' + str(e))
 
             if user.kerberos_id is not None and user.kerberos_id in existing_aws_users:
@@ -128,7 +128,7 @@ class CreateUserWorkflow(object):
 
             if user.gpg_key:
                 logger.debug('Encrypting credentials message for user: {}'.format(user.kerberos_id))
-                user.output_message = gpgapi.encrypt(user.output_message, user.gpg_key)
+                user.output_message = dpp.gpg.encrypt(user.output_message, user.gpg_key)
 
             user.status = UserCreateStatus.ACCOUNT_CREATED
 

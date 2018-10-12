@@ -21,7 +21,7 @@ import argparse
 import logging
 import os.path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'libs', 'python'))
-import awsapi
+import dpp.aws
 
 AWS_ACCOUNT_PROFILE_NAME = "openshift-dev"
 SPREADSHEET_ID = '1TxlsWyV970ct9EYaPrnSU5Ag7eTKw3Yfi2zfLsfqgxM'
@@ -132,7 +132,7 @@ def setup_logging(enable_debug=False):
 
     modules_to_debug = [
         'create_user',
-        'ldapapi.LdapSession',
+        'dpp.api.LdapSession',
     ]
     for module in modules_to_debug:
         mod_logger = logging.getLogger(module)
@@ -141,13 +141,13 @@ def setup_logging(enable_debug=False):
 
 
 def get_workflow(args):
-    aws_session = awsapi.AwsSession.for_profile(profile_name=AWS_ACCOUNT_PROFILE_NAME)
+    aws_session = dpp.aws.AwsSession.for_profile(profile_name=AWS_ACCOUNT_PROFILE_NAME)
     aws_account_id = aws_session.get_account_id()
-    iam_operations = awsapi.IamOperations.for_session(aws_session=aws_session)
+    iam_operations = dpp.aws.IamOperations.for_session(aws_session=aws_session)
     if args.dry_run:
-        aws_user_factory = awsapi.FakeUserFactory()
+        aws_user_factory = dpp.aws.FakeUserFactory()
     else:
-        aws_user_factory = awsapi.UserFactory(iam_operations)
+        aws_user_factory = dpp.aws.UserFactory(iam_operations)
 
     return create_user.CreateUserWorkflow(
         aws_user_factory=aws_user_factory,

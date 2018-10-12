@@ -4,11 +4,12 @@ Clones all the repos from various (hard-coded) orgs into a sub-directory
 """
 
 import functools
-import githubapi.api
 import json
 import git
 import os
 import sys
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'libs', 'python'))
+import dpp.github
 
 def clone_repo(repo_dir, repo_url):
     if os.path.exists(repo_dir):
@@ -31,7 +32,7 @@ def main():
         "coreos-inc",
         "operator-framework",
     ]
-    repos = functools.reduce(lambda x,y: x+y, [githubapi.api.get_repos(org) for org in orgs])
+    repos = functools.reduce(lambda x,y: x+y, [dpp.github.api.get_repos(org) for org in orgs])
     repos = sorted(repos, key=lambda x: x['name'])
 
     cwd = os.path.dirname(os.path.abspath(__file__))

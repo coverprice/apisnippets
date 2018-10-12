@@ -2,12 +2,8 @@
 # Pulls down metadata about Pull Requests from the given set of repos, and writes it to a CSV-format file.
 # This is useful in determining how often tests may need to be run.
 
-import githubapi.api
-import json
-import git
-import os
-import sys
 import csv
+import sys
 
 REPOS = """
 https://github.com/coreos/awscli
