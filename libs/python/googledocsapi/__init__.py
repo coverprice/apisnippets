@@ -14,6 +14,10 @@ from .apiutils import (
 from .auth import (
     OAuth2TokenWorkflow,
 )
+from .gmail import (
+    EmailSender,
+    FakeEmailSender,
+)
 __all__ = [
     'CellRange',
     'CellRangeData',
@@ -24,4 +28,7 @@ __all__ = [
     'get_gmail_service',
 
     'OAuth2TokenWorkflow',
+
+    'EmailSender',
+    'FakeEmailSender',
 ]

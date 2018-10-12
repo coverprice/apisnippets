@@ -1,10 +1,6 @@
-from .mail import (
-    send_message,
-    create_message,
-    create_message_with_attachment,
+from .EmailBuilder import (
+    EmailBuilder,
 )
 __all__ = [
-    'send_message',
-    'create_message',
-    'create_message_with_attachment',
+    'EmailBuilder',
 ]
