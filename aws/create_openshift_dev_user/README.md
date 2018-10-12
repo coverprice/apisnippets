@@ -149,13 +149,11 @@ should already be set up, but if it isn't:
 
     $ ./create.py [global options] spreadsheet [local options]
 
-* `-o DIRECTORY`, `--outdir DIRECTORY` - output credentials files to DIRECTORY. Defaults to the current directory.
-  Each credentials file will be named `${user_email}.gpg`.
 * `--gcp-credentials-file PATH` - path to the Google Sheets service account key file.
 
 Example:
 
-    $ ./create.py spreadsheet --outdir . --gcp-credentials-file ~/.secrets/some_secret_file.json
+    $ ./create.py spreadsheet --gcp-credentials-file ~/.secrets/some_secret_file.json
 
 ### `user` mode
 

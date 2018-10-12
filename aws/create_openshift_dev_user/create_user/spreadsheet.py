@@ -81,7 +81,6 @@ class GoogleSheetsDataBridge(object):
             if "-----BEGIN PGP PUBLIC KEY BLOCK-----" not in gpg_key:
                 gpg_key = None
 
-            # TODO - if we want to update the user status, we'll have to add the sheet row # into the object.
             users_to_create.append(UserToCreate(
                 user_id=email,
                 gpg_key=gpg_key,

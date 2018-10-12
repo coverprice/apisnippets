@@ -22,11 +22,16 @@ import logging
 import os.path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'libs', 'python'))
 import dpp.aws
+import dpp.google
+import dpp.mail
 
 AWS_ACCOUNT_PROFILE_NAME = "openshift-dev"
 SPREADSHEET_ID = '1TxlsWyV970ct9EYaPrnSU5Ag7eTKw3Yfi2zfLsfqgxM'
 # The following spreadsheet is a copy of the original, used for testing.
 # SPREADSHEET_ID = '1SQtqxKN6GU-zjXOYlPbrDUUrnQmRKBmVu-7vuDvS2g8'
+CLIENT_SECRET_FILE = os.path.expanduser('~/.secrets/gcp_service_accounts/client_secret_969537810335-lk3q1l1c4ftpp8d03a98lstmfrvbnd1h.apps.googleusercontent.com.json')
+REFRESH_TOKEN_FILE = os.path.expanduser('~/.secrets/gcp_service_accounts/refresh_token.txt')
+
 
 def get_parser():
     parser = argparse.ArgumentParser(description='Creates an AWS user account in the {} account'.format(AWS_ACCOUNT_PROFILE_NAME))
@@ -39,8 +44,6 @@ def get_parser():
 
     # The "spreadsheet" sub-command
     from_spreadsheet = subparsers.add_parser('spreadsheet')
-    from_spreadsheet.add_argument('-o', '--outdir', nargs='?', type=str, default=None,
-        help='Output directory to write credentials to.')
     from_spreadsheet.add_argument('--gcp-credentials-file', nargs='?', type=str,
         default=os.path.expanduser('~/.secrets/gcp_service_accounts/openshift-devproductivity-bot.json'),
         help="Path to Google Service Account credentials file")
@@ -63,36 +66,25 @@ def cli_workflow(args, workflow):
     if args.keyfile is not None:
         gpg_key = args.keyfile.read()
 
-
     user = create_user.UserToCreate(
         user_id=args.username,
         gpg_key=gpg_key,
-        output_file=output_file,
     )
 
     workflow.run([user])
     if user.status != create_user.UserCreateStatus.ACCOUNT_CREATED:
         return
 
+    output_string = user.output_message.as_string()
     if args.outfile is None:
-        sys.stdout.write("{email}\n{message}\n\n".format(
-            email=user.email,
-            message=user.output_message,
-        ))
+        sys.stdout.write(output_string)
     else:
         if not args.dry_run:
             with open(args.outfile, 'w') as fh:
-                fh.write(user.output_message)
+                fh.write(output_string),
 
 
 def spreadsheet_workflow(args, workflow):
-    outdir = args.outdir
-    if not outdir:
-        outdir = os.getcwd()
-    if not os.path.isdir(outdir):
-        print("Fatal error: Output dir '{}' is not a directory.".format(outdir), file=sys.stderr)
-        sys.exit(1)
-
     if not os.path.isfile(args.gcp_credentials_file):
         print("Fatal error: GCP credentials file '{}' is not a file.".format(args.gcp_credentials_file), file=sys.stderr)
         sys.exit(1)
@@ -101,23 +93,46 @@ def spreadsheet_workflow(args, workflow):
         spreadsheet_id=SPREADSHEET_ID,
         service_account_file=args.gcp_credentials_file,
     )
+    # Note: we instantiate the email service *before* we call workflow.run(), so that if the
+    # script user needs to authenticate with the Gmail API, they are prompted here and not *after*
+    # accounts have been created. This avoids a situation where the user messes up their
+    # Gmail authentication, leaving the script in a state where accounts have been provisioned
+    # but there's no way to send the credentials.
+    gmail_service = dpp.google.get_gmail_service(
+        client_secret_file=CLIENT_SECRET_FILE,
+        refresh_token_file=REFRESH_TOKEN_FILE,
+    )
+
     if not args.dry_run:
         spreadsheet_data_bridge.fix_up_user_status()
     users_to_create = spreadsheet_data_bridge.get_users_to_create()
 
+    if not len(users_to_create):
+        print("No users to create.")
+        sys.exit(0)
+
+    if args.dry_run:
+        # This causes emails to be send to the script runner user, not the user_to_create.
+        email_sender = dpp.google.FakeEmailSender(service=gmail_service)
+    else:
+        email_sender = dpp.google.EmailSender(service=gmail_service)
+
     workflow.run(users_to_create)
 
-    if not args.dry_run:
-        for user in users_to_create:
-            if user.status == create_user.UserCreateStatus.ACCOUNT_CREATED:
-                output_file = os.path.join(outdir, '{}.gpg'.format(user.email))
-                with open(output_file, 'w') as fh:
-                    fh.write(user.output_message)
+    for user in users_to_create:
+        if user.status == create_user.UserCreateStatus.ACCOUNT_CREATED:
+            email_sender.send(user.output_message)
 
+    if not args.dry_run:
         spreadsheet_data_bridge.update_user_status(users_to_create)
 
 
 def setup_logging(enable_debug=False):
+    """
+    If we naively enable logging.DEBUG for the root logger, we'll get debug messages
+    for *all* Python modules, even 3rd-party ones. This is typically too verbose,
+    so this function restricts it to just modules under our direct control.
+    """
     logging.basicConfig(handlers=[logging.NullHandler()])
 
     level = logging.INFO

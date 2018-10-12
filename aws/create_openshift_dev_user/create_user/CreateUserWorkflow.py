@@ -8,11 +8,18 @@ import sys
 from pprint import pprint
 import logging
 logger = logging.getLogger(__name__)
+
+import os.path
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..', 'libs', 'python'))
 import dpp.aws
 import dpp.ldap
 import dpp.gpg
+import dpp.mail
 
-from .message import gen_credentials_message
+from .message import (
+    gen_main_message,
+    gen_credentials_message,
+)
 from .UserToCreate import (
     UserToCreate,
     UserCreateStatus,
@@ -41,8 +48,11 @@ class CreateUserWorkflow(object):
 
     def run(self, users_to_create : list):
         """
+
+        Runs the workflow. Note that although users are created and each user's email
+        message is generated, this object does NOT send the email.
+
         @param users_to_create [UsersToCreate]
-        @return [UsersToCreate] - the users that were actually created
         """
         self._preflight_checks(users_to_create)
         self._decide_go_nogo(users_to_create)
@@ -112,25 +122,54 @@ class CreateUserWorkflow(object):
 
     def _create_users(self, users_to_create : list) -> None:
         for user in users_to_create:
-            if user.status != UserCreateStatus.READY_TO_CREATE:
-                continue
-            logger.debug('Creating user: {}'.format(user.kerberos_id))
-            aws_user_info = self.aws_user_factory.create_user(
-                username=user.kerberos_id,
-                group_names=["Dev"],
-            )
+            if user.status == UserCreateStatus.READY_TO_CREATE:
+                aws_user_info = self._create_user(user)
+                user.output_message = self._gen_email(user, aws_user_info)
 
-            user.output_message = gen_credentials_message(
-                aws_user_info,
-                self.aws_account_id,
-                self.aws_account_alias,
-            )
 
-            if user.gpg_key:
-                logger.debug('Encrypting credentials message for user: {}'.format(user.kerberos_id))
-                user.output_message = dpp.gpg.encrypt(user.output_message, user.gpg_key)
+    def _create_user(self, user : UserToCreate) -> None:
+        """
+        Calls AWS API to create the user and place them into Groups.
 
-            user.status = UserCreateStatus.ACCOUNT_CREATED
+        @return dict - block of info about the created user
+        """
+        logger.debug('Creating user: {}'.format(user.kerberos_id))
+        aws_user_info = self.aws_user_factory.create_user(
+            username=user.kerberos_id,
+            group_names=["Dev"],
+        )
+        user.status = UserCreateStatus.ACCOUNT_CREATED
+        return aws_user_info
+
+
+    def _gen_email(self, user, aws_user_info):
+        """
+        Generates a MIME message to send to the user with information about
+        accessing the account. The credentials are encrypted and added as an
+        attachment.
+
+        @return email.mime.MIMEMultipart
+        """
+        main_msg = gen_main_message(aws_account_alias=self.aws_account_alias)
+        credentials_msg = gen_credentials_message(
+            aws_account_alias=self.aws_account_alias,
+            aws_account_id=self.aws_account_id,
+            aws_user_info=aws_user_info,
+        )
+        if user.gpg_key:
+            logger.debug('Encrypting credentials message for user: {}'.format(user.kerberos_id))
+            credentials_msg = dpp.gpg.encrypt(credentials_msg, user.gpg_key)
+
+        email_builder = dpp.mail.EmailBuilder(
+            to=user.email,
+            subject="{} AWS IAM account provisioned".format(self.aws_account_alias),
+        )
+        email_builder.add_html_message(body=main_msg)
+        email_builder.add_attachment_from_var(
+            contents=credentials_msg,
+            filename="{}.{}.credentials.txt.gpg".format(user.email, self.aws_account_alias),
+        )
+        return email_builder.get_mime_message()
 
 
     def _retrieve_ldap_info(self, user : UserToCreate) -> None:
