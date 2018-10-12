@@ -25,6 +25,7 @@ email_sender = dpp.google.EmailSender(service=gmail_service)
 builder = dpp.mail.EmailBuilder(
     to=TARGET_EMAIL,
     subject="Test message",
+    sender="James Russsell <jrussell@redhat.com>",
 )
 builder.add_html_message(body="""
     <h1>Good news everyone!</h1>

@@ -27,7 +27,11 @@ class EmailBuilder(object):
         @param to:          Email address of the receiver.
         @param subject:     The subject of the email message.
         @param sender:      Email address of the sender. When using the GMail API, 'me' is
-                            a special value that means the current authenticated user.
+                            a special value that means the current authenticated user, *but*
+                            the recipient will only see the email address,
+                            e.g. 'youremail@domain.com'. If you want to include your full name,
+                            specify it like so: "Your Full Name <youremail@domain.com>"
+
         """
         message = MIMEMultipart()
         message['to'] = to
