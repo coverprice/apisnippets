@@ -132,7 +132,8 @@ def setup_logging(enable_debug=False):
 
     modules_to_debug = [
         'create_user',
-        'dpp.api.LdapSession',
+        'dpp.ldap.LdapSession',
+        'dpp.google.gmail.send',
     ]
     for module in modules_to_debug:
         mod_logger = logging.getLogger(module)
