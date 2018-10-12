@@ -11,7 +11,7 @@ import sys
 import csv
 from pprint import pprint
 import os.path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'libs/python'))
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'libs', 'python'))
 import dpp.aws
 
 # Important: In AWS, "account" refers to a resource container (VMs, networks, etc), and "IAM account" refers to (typically) a person.
