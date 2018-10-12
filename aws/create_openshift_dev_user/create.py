@@ -143,7 +143,7 @@ def setup_logging(enable_debug=False):
 def get_workflow(args):
     aws_session = awsapi.AwsSession.for_profile(profile_name=AWS_ACCOUNT_PROFILE_NAME)
     aws_account_id = aws_session.get_account_id()
-    iam_operations = awsapi.IamOperations.for_session(aws_session.session)
+    iam_operations = awsapi.IamOperations.for_session(aws_session=aws_session)
     if args.dry_run:
         aws_user_factory = awsapi.FakeUserFactory()
     else:

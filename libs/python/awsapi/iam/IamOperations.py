@@ -10,47 +10,20 @@ import boto3
 import botocore
 import functools
 from pprint import pprint
+from ..AwsSession import AwsSession
+from ..Operations import Operations
 
 
-class IamOperations(object):
-    """
-    Class for making various IAM operations easier
-    """
-    def __init__(self, session, iam_client):
-        self.session = session
-        self.iam_client = iam_client
-
-
-    @staticmethod
-    def for_session(session):
-        """
-        Use this factory method when you have a session that's already tied to the account you want the IAM client for
-        """
-        iam_client = session.client('iam')
-        return IamOperations(session=session, iam_client=iam_client)
-
-
-    @staticmethod
-    def for_account(session, credentials):
-        """
-        Use this factory method when you have a session tied to an AWS account, but you want an IAM client for a different account.
-
-        Given the ephemeral credentials (which also imply a specific sub-account),
-        and return an IAM (Identity Access Management) client for that sub-account with those credentials.
-        """
-        iam_client = boto3.client(
-            service_name='iam',
-            aws_access_key_id=credentials['AccessKeyId'],
-            aws_secret_access_key=credentials['SecretAccessKey'],
-            aws_session_token=credentials['SessionToken'],
-        )
-        return IamOperations(session=session, iam_client=iam_client)
+class IamOperations(Operations):
+    @classmethod
+    def get_service_client_name(cls):
+        return 'iam'
 
 
     @functools.lru_cache()
     def get_account_alias(self):
         try:
-            response = self.iam_client.list_account_aliases()
+            response = self.aws_client.list_account_aliases()
         except botocore.exceptions.ClientError:
             return '[Permission denied]'
         if len(response['AccountAliases']) == 0:
@@ -75,7 +48,7 @@ class IamOperations(object):
 		}
 	    }
         """
-        user_paginator = self.iam_client.get_paginator('list_users')
+        user_paginator = self.aws_client.get_paginator('list_users')
         ret = []
         try:
             for response in user_paginator.paginate():
@@ -96,7 +69,7 @@ class IamOperations(object):
 
     @functools.lru_cache()
     def get_all_policies(self):
-        policy_paginator = self.iam_client.get_paginator('list_policies')
+        policy_paginator = self.aws_client.get_paginator('list_policies')
         ret = []
         for response in policy_paginator.paginate(Scope='All', OnlyAttached=False):
             ret += response['Policies']
@@ -105,19 +78,19 @@ class IamOperations(object):
 
     @functools.lru_cache()
     def get_policy(self, policy_arn : str):
-        response = self.iam_client.get_policy(PolicyArn=policy_arn)
+        response = self.aws_client.get_policy(PolicyArn=policy_arn)
         return response['Policy']
 
 
     @functools.lru_cache()
     def get_policy_version(self, policy_arn : str, version : str):
-        response = self.iam_client.get_policy_version(PolicyArn=policy_arn, VersionId=version)
+        response = self.aws_client.get_policy_version(PolicyArn=policy_arn, VersionId=version)
         return response['PolicyVersion']
 
 
     @functools.lru_cache()
     def get_all_groups(self):
-        group_paginator = self.iam_client.get_paginator('list_groups')
+        group_paginator = self.aws_client.get_paginator('list_groups')
         ret = []
         for response in group_paginator.paginate():
             ret += response['Groups']
@@ -142,7 +115,7 @@ class IamOperations(object):
         try:
             user.load()
             return True
-        except self.iam_client.exceptions.NoSuchEntityException:
+        except self.aws_client.exceptions.NoSuchEntityException:
             return False
 
 

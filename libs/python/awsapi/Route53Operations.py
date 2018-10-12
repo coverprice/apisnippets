@@ -10,42 +10,14 @@ import boto3
 import botocore
 import functools
 from pprint import pprint
+from .AwsSession import AwsSession
+from .Operations import Operations
 
 
-class Route53Operations(object):
-    """
-    Class for making various IAM operations easier
-    """
-    def __init__(self, session, route53_client):
-        self.session = session
-        self.route53_client = route53_client
-
-
-    @staticmethod
-    def for_session(session):
-        """
-        Use this factory method when you have a session that's already tied to the account you want the IAM client for
-        """
-        client = session.client('route53')
-        return Route53Operations(session=session, route53_client=client)
-
-
-    @staticmethod
-    def for_account(session, credentials):
-        """
-        Use this factory method when you have a session tied to an AWS account, but you want an Route53 client for a different account.
-
-        Given the ephemeral credentials (which also imply a specific sub-account),
-        and return a Route53 client for that sub-account with those credentials.
-        """
-        client = boto3.client(
-            service_name='route53',
-            aws_access_key_id=credentials['AccessKeyId'],
-            aws_secret_access_key=credentials['SecretAccessKey'],
-            aws_session_token=credentials['SessionToken'],
-        )
-        return Route53Operations(session=session, route53_client=client)
-
+class Route53Operations(Operations):
+    @classmethod
+    def get_service_client_name(cls):
+        return 'route53'
 
     def get_hosted_zones(self):
         """
@@ -65,7 +37,7 @@ class Route53Operations(object):
                 }
             }
         """
-        paginator = self.route53_client.get_paginator('list_hosted_zones')
+        paginator = self.aws_client.get_paginator('list_hosted_zones')
         ret = []
         try:
             for response in paginator.paginate():

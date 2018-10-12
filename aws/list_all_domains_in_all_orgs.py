@@ -41,12 +41,12 @@ csvout.writerow([
 
 for account in active_accounts:
     if account['Id'] == ROOT_ACCOUNT_ID:
-        route53_ops = awsapi.Route53Operations.for_session(aws_session.session)
+        route53_ops = awsapi.Route53Operations.for_session(aws_session=aws_session)
     else:
         sts_token = aws_session.get_sts_token_for_account(ROOT_ACCOUNT_ID, account['Id'])
         if sts_token is None:
             raise Exception("Could not get STS token for {}".format(account['Name']))
-        route53_ops = awsapi.Route53Operations.for_account(aws_session.session, sts_token['Credentials'])
+        route53_ops = awsapi.Route53Operations.for_account(aws_session=aws_session, credentials=sts_token['Credentials'])
 
     hosted_zones = route53_ops.get_hosted_zones()
 

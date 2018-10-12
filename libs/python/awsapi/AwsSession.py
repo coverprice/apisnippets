@@ -60,3 +60,24 @@ class AwsSession(object):
             DurationSeconds=1000,
         )
         return response
+
+    def get_client(self, service_name : str):
+        """
+        Return an API client for a specific service ('ec2', 'route53', 'iam', ...)
+        """
+        return self.session.client(service_name)
+
+    def get_client_for_account(self, service_name : str, credentials : dict):
+        """
+        Use this method when you have a session already tied to an AWS account, but you want
+        an API client for a different account.
+
+        Given the ephemeral sts_credentials (which also imply a specific sub-account),
+        and return an API client of the given service name for that sub-account.
+        """
+        return boto3.client(
+            service_name=service_name,
+            aws_access_key_id=credentials['AccessKeyId'],
+            aws_secret_access_key=credentials['SecretAccessKey'],
+            aws_session_token=credentials['SessionToken'],
+        )
