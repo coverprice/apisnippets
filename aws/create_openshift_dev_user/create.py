@@ -114,6 +114,9 @@ def spreadsheet_workflow(args, workflow):
     if args.dry_run:
         # This causes emails to be send to the script runner user, not the user_to_create.
         email_sender = dpp.google.FakeEmailSender(service=gmail_service)
+        if args.debug:
+            email_sender.send_to_self(enabled=True)
+            email_sender.output_body(enabled=True)
     else:
         email_sender = dpp.google.EmailSender(service=gmail_service)
 
