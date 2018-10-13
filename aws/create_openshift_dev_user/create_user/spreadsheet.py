@@ -96,7 +96,7 @@ class GoogleSheetsDataBridge(object):
 
         def update_status(user, new_value):
             write_buffer.set(
-                cell=dpp.google.CellRange(sheet=SHEET_NAME, top_left_col=STATUS, top_left_row=user.spreadsheet_row),
+                cell=dpp.google.CellRange(sheet=SHEET_NAME, top_left_col=STATUS_COLUMN, top_left_row=user.spreadsheet_row),
                 value=new_value,
             )
 

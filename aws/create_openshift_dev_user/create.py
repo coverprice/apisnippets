@@ -122,6 +122,7 @@ def spreadsheet_workflow(args, workflow):
 
     workflow.run(users_to_create)
 
+    print("Emailing users with credentials...")
     for user in users_to_create:
         if user.status == create_user.UserCreateStatus.ACCOUNT_CREATED:
             email_sender.send(user.output_message)
@@ -190,5 +191,6 @@ def main():
     else:
         parser.print_usage()
         sys.exit(1)
+    print("Done")
 
 main()
