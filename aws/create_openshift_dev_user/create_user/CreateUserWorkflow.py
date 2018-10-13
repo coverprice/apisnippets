@@ -28,22 +28,24 @@ from .UserToCreate import (
 
 class CreateUserWorkflow(object):
     def __init__(self,
+            ldap_user_searcher : dpp.ldap.UserSearcher,
             aws_user_factory,
             iam_operations : dpp.aws.IamOperations,
             aws_account_id : str,
             aws_account_alias : str,
         ):
         """
-        @param aws_user_factory dpp.aws.UserFactory
-        @param iam_operations dpp.aws.IamOperations
-        @param aws_account_id - 12-digit account ID
-        @param aws_account_alias - alias for the 12-digit account ID (if there is one)
+        @param ldap_user_searcher:      dpp.ldap.UserSearcher
+        @param aws_user_factory:        dpp.aws.UserFactory
+        @param iam_operations:          dpp.aws.IamOperations
+        @param aws_account_id:          12-digit account ID
+        @param aws_account_alias:       alias for the 12-digit account ID (if there is one)
         """
+        self.ldap_user_searcher = ldap_user_searcher
         self.aws_user_factory = aws_user_factory
         self.iam_operations = iam_operations
         self.aws_account_id = aws_account_id
         self.aws_account_alias = aws_account_alias
-        self.ldap_user_searcher = dpp.ldap.UserSearcher()
 
 
     def run(self, users_to_create : list):

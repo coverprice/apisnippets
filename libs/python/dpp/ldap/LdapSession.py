@@ -10,6 +10,9 @@ import logging
 logger = logging.getLogger(__name__)
 from pprint import pprint
 
+class ConnectionFailure(Exception):
+    pass
+
 # To get a list of all attributes, connect to the VPN and run something like this:
 # $ ldapsearch -x -H ldap://ldap.corp.redhat.com -L -b 'dc=redhat,dc=com' 'uid=jrussell'
 
@@ -18,7 +21,10 @@ class LdapSession(object):
         # Requires VPN connection to work.
         ldap_host = 'ldap.corp.redhat.com'
         logger.debug('Connecting to LDAP server: {}'.format(ldap_host))
-        self.conn = ldap3.Connection(ldap_host, auto_bind=True)
+        try:
+            self.conn = ldap3.Connection(ldap_host, auto_bind=True)
+        except ldap3.core.exceptions.LDAPSocketOpenError as e:
+            raise ConnectionFailure("Could not open connection to {}".format(ldap_host)) from e
 
     def search(self, search_filter, search_base, return_attributes=None):
         if return_attributes is None:

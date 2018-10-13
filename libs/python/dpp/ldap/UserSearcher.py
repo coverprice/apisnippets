@@ -9,6 +9,9 @@ from .UserRecord import UserRecord
 
 class UserSearcher(object):
     def __init__(self, session=None):
+        """
+        @raise ConnectionFailure if the LDAP server can't be connected to.
+        """
         if session is None:
             session = LdapSession()
         self.session = session

@@ -25,6 +25,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'libs', 'pyt
 import dpp.aws
 import dpp.google
 import dpp.mail
+import dpp.ldap
 
 AWS_ACCOUNT_PROFILE_NAME = "openshift-dev"
 SPREADSHEET_ID = '1TxlsWyV970ct9EYaPrnSU5Ag7eTKw3Yfi2zfLsfqgxM'
@@ -194,7 +195,17 @@ def get_workflow(args):
     else:
         aws_user_factory = dpp.aws.UserFactory(iam_operations)
 
+    try:
+        ldap_user_searcher = dpp.ldap.UserSearcher()
+    except dpp.ldap.ConnectionFailure as e:
+        print("Fatal error: Could not connect to LDAP server."
+            " Please ensure you are on the VPN or the Red Hat internal network and try again.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
+
     return create_user.CreateUserWorkflow(
+        ldap_user_searcher=ldap_user_searcher,
         aws_user_factory=aws_user_factory,
         iam_operations=iam_operations,
         aws_account_id=aws_account_id,
