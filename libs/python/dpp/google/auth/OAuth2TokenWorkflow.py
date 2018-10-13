@@ -12,11 +12,17 @@ import os.path
 
 class OAuth2TokenWorkflow(object):
     def __init__(self,
-            client_secret_file : str,     # Path to the Service Account's JSON credentials file
-            refresh_token_file : str,       # Writeable file path to store the refresh token
+            client_config : dict,
+            refresh_token_file : str,
             scopes : list,
         ):
-        self.client_secret_file = client_secret_file
+        """
+        @param client_secret:       json.loads() of the Oauth2 client secret file (downloadable
+                                    from [GCP Project] -> APIs & Services -> Credentials)
+        @param refresh_token_file:  path to a file to store the Refresh Token.
+        @param scopes:              list of permission scopes to grant this client. (These will
+                                    be specific to the API type(s) you want this client to access)
+        """
         self.refresh_token_file = refresh_token_file
         # self._credentials = None            # google.oauth2.credentials.Credentials
 
@@ -29,8 +35,8 @@ class OAuth2TokenWorkflow(object):
         self._access_token = None
         self._access_token_expire_time = None   # Epoch time that the access token will expire
 
-        self._flow = Flow.from_client_secrets_file(
-            client_secrets_file=client_secret_file,
+        self._flow = Flow.from_client_config(
+            client_config=client_config,
             scopes=['https://mail.google.com/'],
         )
         # Hardcoded dummy redirect URI for non-web apps.

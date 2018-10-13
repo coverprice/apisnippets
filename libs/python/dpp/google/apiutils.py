@@ -23,15 +23,18 @@ def get_sheets_service(service_account_file, read_only=False):
 
 
 GMAIL_SCOPES = ['https://www.googleapis.com/auth/gmail.send']
-def get_gmail_service(client_secret_file : str, refresh_token_file : str):
+def get_gmail_service(
+        client_config: dict,
+        refresh_token_file : str,
+    ):
     """
     For more info on these params, see the auth/README.md
-    @param client_secret_file - path to the Oauth2 client secret (downloadable from
-                                [GCP Project] -> APIs & Services -> Credentials)
-    @param refresh_token_file - path to a file to store the Refresh Token.
+    @param client_secret:       json.loads() of the Oauth2 client secret file (downloadable
+                                from [GCP Project] -> APIs & Services -> Credentials)
+    @param refresh_token_file:  path to a file to store the Refresh Token.
     """
     oauth2_token_workflow = OAuth2TokenWorkflow(
-        client_secret_file=client_secret_file,
+        client_config=client_config,
         refresh_token_file=refresh_token_file,
         scopes=GMAIL_SCOPES,
     )

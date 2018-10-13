@@ -19,6 +19,7 @@ from pprint import pprint
 import create_user
 import argparse
 import logging
+import json
 import os.path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', 'libs', 'python'))
 import dpp.aws
@@ -29,8 +30,32 @@ AWS_ACCOUNT_PROFILE_NAME = "openshift-dev"
 SPREADSHEET_ID = '1TxlsWyV970ct9EYaPrnSU5Ag7eTKw3Yfi2zfLsfqgxM'
 # The following spreadsheet is a copy of the original, used for testing.
 # SPREADSHEET_ID = '1SQtqxKN6GU-zjXOYlPbrDUUrnQmRKBmVu-7vuDvS2g8'
-CLIENT_SECRET_FILE = os.path.expanduser('~/.secrets/gcp_service_accounts/client_secret_969537810335-lk3q1l1c4ftpp8d03a98lstmfrvbnd1h.apps.googleusercontent.com.json')
+
 REFRESH_TOKEN_FILE = os.path.expanduser('~/.secrets/gcp_service_accounts/refresh_token.txt')
+
+# Despite the '_SECRET' name, this is not actually a secret and it's fine to bake this to source code. This
+# 'secret' doesn't actually grant any abilities by itself. The first time a user runs this script, this
+# data is used to identify the app and generate a URL that the script user must copy/paste into a
+# browser, which will tell the user who is doing the requesting (OpenShift DPP bot) and what they
+# want to access (the 'send message' ability of the user's Gmail). It's up to the user to approve that,
+# which will ultimately result in an ephemeral access/refresh token that the script can use, and *those*
+# are kept secret.
+GMAIL_CLIENT_SECRET = """
+{
+  "installed": {
+    "client_id": "969537810335-lk3q1l1c4ftpp8d03a98lstmfrvbnd1h.apps.googleusercontent.com",
+    "project_id": "openshift-devproducti",
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+    "token_uri": "https://www.googleapis.com/oauth2/v3/token",
+    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+    "client_secret": "_xDcGtTYOeiKRBzyXtLpk2dT",
+    "redirect_uris": [
+      "urn:ietf:wg:oauth:2.0:oob",
+      "http://localhost"
+    ]
+  }
+}
+"""
 
 
 def get_parser():
@@ -99,7 +124,7 @@ def spreadsheet_workflow(args, workflow):
     # Gmail authentication, leaving the script in a state where accounts have been provisioned
     # but there's no way to send the credentials.
     gmail_service = dpp.google.get_gmail_service(
-        client_secret_file=CLIENT_SECRET_FILE,
+        client_config=json.loads(GMAIL_CLIENT_SECRET),
         refresh_token_file=REFRESH_TOKEN_FILE,
     )
 

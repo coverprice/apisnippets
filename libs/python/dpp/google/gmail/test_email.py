@@ -7,6 +7,7 @@ Tests sending an email to yourself.
 import sys
 import csv
 from pprint import pprint
+import json
 import os.path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..', '..'))
 
@@ -17,8 +18,11 @@ CLIENT_SECRET_FILE = os.path.expanduser('~/.secrets/gcp_service_accounts/client_
 REFRESH_TOKEN_FILE = os.path.expanduser('~/.secrets/gcp_service_accounts/refresh_token.txt')
 TARGET_EMAIL = 'jrussell@redhat.com'
 
+with open(CLIENT_SECRET_FILE, 'r') as fh:
+    client_config = json.load(fh)
+
 gmail_service = dpp.google.get_gmail_service(
-    client_secret_file=CLIENT_SECRET_FILE,
+    client_config=client_config,
     refresh_token_file=REFRESH_TOKEN_FILE,
 )
 email_sender = dpp.google.EmailSender(service=gmail_service)
