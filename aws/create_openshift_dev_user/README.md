@@ -141,8 +141,9 @@ should already be set up, but if it isn't:
 
 ### Global options
 
-* `--dry-run` - Perform all actions, but don't actually create the AWS account, update the spreadsheet, or write to any files.
-  The generated user credentials will have the correct username, but the password/API keys are static unusable dummies.
+* `--dry-run` - Perform all actions, but don't actually create the AWS account, update the spreadsheet, write to any files,
+  or send any emails. The generated user credentials will have the correct username, but the password/API keys are
+  static unusable dummies.
 * `--debug` - Log debugging information to stderr.
 
 ### `spreadsheet` mode
